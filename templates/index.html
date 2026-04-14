@@ -1,1 +1,842 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DemoSync — Orquestador de Microservicios</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Variables ───────────────────────────────────────────────────── */
+    :root {
+      --bg:        #07080c;
+      --surface:   #0d1117;
+      --panel:     #111820;
+      --border:    #1e2d3d;
+      --accent:    #00e5ff;
+      --accent2:   #ff6b35;
+      --green:     #39ff14;
+      --muted:     #445566;
+      --text:      #c9d5e0;
+      --text-dim:  #607080;
+      --mono:      'Share Tech Mono', monospace;
+      --sans:      'Barlow', sans-serif;
+      --display:   'Barlow Condensed', sans-serif;
+    }
 
+    /* ── Reset & Base ────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-weight: 300;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Scanline overlay ────────────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,229,255,.012) 2px,
+        rgba(0,229,255,.012) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────── */
+    header {
+      position: relative;
+      padding: 3rem 2rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, rgba(0,229,255,.04) 0%, transparent 100%);
+      overflow: hidden;
+    }
+
+    header::after {
+      content: 'ORCHESTRATOR v1.0';
+      position: absolute;
+      right: 2rem;
+      top: 1.2rem;
+      font-family: var(--mono);
+      font-size: .65rem;
+      color: var(--muted);
+      letter-spacing: .2em;
+    }
+
+    .logo-line {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+    }
+
+    .logo-mark {
+      font-family: var(--display);
+      font-size: 4rem;
+      font-weight: 900;
+      letter-spacing: -.02em;
+      line-height: 1;
+      color: var(--accent);
+      text-shadow: 0 0 40px rgba(0,229,255,.4);
+    }
+
+    .logo-mark span { color: var(--accent2); }
+
+    .logo-sub {
+      font-family: var(--mono);
+      font-size: .75rem;
+      color: var(--muted);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-top: .5rem;
+    }
+
+    .header-desc {
+      margin-top: 1rem;
+      max-width: 60ch;
+      font-size: .95rem;
+      color: var(--text-dim);
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(255,107,53,.12);
+      border: 1px solid rgba(255,107,53,.35);
+      color: var(--accent2);
+      font-family: var(--mono);
+      font-size: .65rem;
+      padding: .2em .7em;
+      border-radius: 2px;
+      letter-spacing: .1em;
+      margin-top: .8rem;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────────── */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 3rem 2rem 6rem;
+      display: grid;
+      gap: 2rem;
+    }
+
+    /* ── Section titles ──────────────────────────────────────────────── */
+    .section-title {
+      font-family: var(--display);
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .section-title::before {
+      content: '';
+      display: block;
+      width: 3px;
+      height: 1em;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* ── Architecture diagram ────────────────────────────────────────── */
+    .arch-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+      padding: 2rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .arch-diagram::before {
+      content: 'ARQUITECTURA SIMULADA';
+      position: absolute;
+      top: .75rem;
+      left: 1rem;
+      font-family: var(--mono);
+      font-size: .6rem;
+      color: var(--muted);
+      letter-spacing: .15em;
+    }
+
+    .arch-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 1rem 1.2rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      min-width: 130px;
+      position: relative;
+      transition: border-color .3s;
+    }
+
+    .arch-node:hover { border-color: var(--accent); }
+
+    .arch-node.highlight { border-color: var(--accent); }
+    .arch-node.highlight .node-icon { color: var(--accent); }
+
+    .node-icon {
+      font-size: 1.6rem;
+      margin-bottom: .4rem;
+    }
+
+    .node-label {
+      font-family: var(--mono);
+      font-size: .65rem;
+      color: var(--text-dim);
+      letter-spacing: .08em;
+    }
+
+    .node-name {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: .95rem;
+      color: var(--text);
+      margin-top: .1rem;
+    }
+
+    .arch-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 .5rem;
+      gap: .15rem;
+      color: var(--muted);
+    }
+
+    .arrow-line {
+      width: 50px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--muted), var(--accent));
+      position: relative;
+    }
+
+    .arrow-line::after {
+      content: '▶';
+      position: absolute;
+      right: -6px;
+      top: -7px;
+      font-size: .6rem;
+      color: var(--accent);
+    }
+
+    .arrow-label {
+      font-family: var(--mono);
+      font-size: .55rem;
+      color: var(--muted);
+      letter-spacing: .05em;
+      white-space: nowrap;
+    }
+
+    /* ── Endpoint cards grid ─────────────────────────────────────────── */
+    .endpoints-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .endpoint-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.5rem;
+      transition: border-color .25s, transform .25s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .endpoint-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px;
+      height: 100%;
+    }
+
+    .endpoint-card.post::before { background: var(--accent2); }
+    .endpoint-card.get::before  { background: var(--green); }
+
+    .endpoint-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .ep-method {
+      font-family: var(--mono);
+      font-size: .65rem;
+      font-weight: bold;
+      letter-spacing: .12em;
+      padding: .15em .5em;
+      border-radius: 2px;
+      display: inline-block;
+      margin-bottom: .6rem;
+    }
+
+    .ep-method.post {
+      background: rgba(255,107,53,.15);
+      color: var(--accent2);
+      border: 1px solid rgba(255,107,53,.3);
+    }
+
+    .ep-method.get {
+      background: rgba(57,255,20,.1);
+      color: var(--green);
+      border: 1px solid rgba(57,255,20,.25);
+    }
+
+    .ep-path {
+      font-family: var(--mono);
+      font-size: .85rem;
+      color: var(--accent);
+      margin-bottom: .6rem;
+      word-break: break-all;
+    }
+
+    .ep-title {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+      margin-bottom: .4rem;
+    }
+
+    .ep-desc {
+      font-size: .82rem;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+
+    .ep-fields {
+      margin-top: .9rem;
+      padding-top: .7rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .ep-fields-title {
+      font-family: var(--mono);
+      font-size: .6rem;
+      color: var(--muted);
+      letter-spacing: .1em;
+      margin-bottom: .4rem;
+    }
+
+    .field-pill {
+      display: inline-block;
+      background: rgba(30,45,61,.8);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: .65rem;
+      padding: .1em .5em;
+      border-radius: 2px;
+      color: var(--text-dim);
+      margin: .15rem .15rem 0 0;
+    }
+
+    .field-pill.required {
+      border-color: rgba(0,229,255,.3);
+      color: var(--accent);
+    }
+
+    /* ── Try it panel ────────────────────────────────────────────────── */
+    .try-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .try-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .try-tab {
+      font-family: var(--mono);
+      font-size: .7rem;
+      letter-spacing: .08em;
+      padding: .7rem 1.2rem;
+      cursor: pointer;
+      color: var(--muted);
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: color .2s, border-color .2s;
+    }
+
+    .try-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .try-body {
+      padding: 1.5rem;
+      display: none;
+    }
+
+    .try-body.active { display: block; }
+
+    .try-label {
+      font-family: var(--mono);
+      font-size: .65rem;
+      color: var(--muted);
+      letter-spacing: .1em;
+      margin-bottom: .4rem;
+      display: block;
+    }
+
+    .try-input {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: .8rem;
+      padding: .55rem .75rem;
+      border-radius: 3px;
+      margin-bottom: .75rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .try-input:focus { border-color: var(--accent); }
+
+    .try-btn {
+      background: rgba(0,229,255,.1);
+      border: 1px solid rgba(0,229,255,.4);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: .75rem;
+      letter-spacing: .12em;
+      padding: .6rem 1.4rem;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background .2s, box-shadow .2s;
+      text-transform: uppercase;
+    }
+
+    .try-btn:hover {
+      background: rgba(0,229,255,.18);
+      box-shadow: 0 0 16px rgba(0,229,255,.2);
+    }
+
+    .try-output {
+      margin-top: 1rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: .9rem 1rem;
+      font-family: var(--mono);
+      font-size: .75rem;
+      color: var(--green);
+      min-height: 60px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .try-output.error { color: var(--accent2); }
+    .try-output.dim   { color: var(--muted); font-style: italic; }
+
+    /* ── State ticker ────────────────────────────────────────────────── */
+    .ticker {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.2rem 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .ticker-item {
+      text-align: center;
+    }
+
+    .ticker-value {
+      font-family: var(--display);
+      font-weight: 900;
+      font-size: 2.4rem;
+      color: var(--accent);
+      line-height: 1;
+      text-shadow: 0 0 24px rgba(0,229,255,.35);
+    }
+
+    .ticker-label {
+      font-family: var(--mono);
+      font-size: .6rem;
+      color: var(--muted);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-top: .3rem;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: .65rem;
+      color: var(--muted);
+      letter-spacing: .1em;
+    }
+
+    footer span { color: var(--accent); }
+
+    /* ── Pulse animation ─────────────────────────────────────────────── */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .3; }
+    }
+
+    .pulse { animation: pulse 2s ease-in-out infinite; }
+
+    /* ── Responsive ──────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .logo-mark { font-size: 2.8rem; }
+      .arch-diagram { flex-direction: column; }
+      .arch-arrow { transform: rotate(90deg); margin: .25rem 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════ HEADER ════════════════════════════════ -->
+<header>
+  <div class="logo-line">
+    <div class="logo-mark">Demo<span>Sync</span></div>
+  </div>
+  <div class="logo-sub">Central Microservice Orchestrator · Simulation Demo</div>
+  <p class="header-desc">
+    Demostración de un orquestador central que coordina múltiples microservicios
+    stateless mediante un sistema de tareas con callbacks HTTP. Todo el estado
+    se mantiene en memoria; los "microservicios" son simulados con URLs de
+    callback en lugar de contenedores reales.
+  </p>
+  <span class="badge">⚠ SIMULACIÓN DE DEMOSTRACIÓN — Sin Docker real</span>
+</header>
+
+<!-- ════════════════════════════ MAIN ══════════════════════════════════ -->
+<main>
+
+  <!-- ── Arquitectura ────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Arquitectura simulada</div>
+    <div class="arch-diagram">
+      <div class="arch-node">
+        <div class="node-icon">🖥</div>
+        <div class="node-label">Origen</div>
+        <div class="node-name">Cliente</div>
+      </div>
+
+      <div class="arch-arrow">
+        <div class="arrow-line"></div>
+        <div class="arrow-label">POST /orquestar-tarea</div>
+      </div>
+
+      <div class="arch-node highlight">
+        <div class="node-icon">⚙️</div>
+        <div class="node-label">Núcleo</div>
+        <div class="node-name">DemoSync</div>
+      </div>
+
+      <div class="arch-arrow">
+        <div class="arrow-line"></div>
+        <div class="arrow-label">URL callback generada</div>
+      </div>
+
+      <div class="arch-node">
+        <div class="node-icon">🤖</div>
+        <div class="node-label">Simulado</div>
+        <div class="node-name">Microservicio</div>
+      </div>
+
+      <div class="arch-arrow">
+        <div class="arrow-line" style="background: linear-gradient(90deg, var(--accent2), var(--muted));"></div>
+        <div class="arrow-label">POST /recibir-datos</div>
+      </div>
+
+      <div class="arch-node">
+        <div class="node-icon">🗄</div>
+        <div class="node-label">En memoria</div>
+        <div class="node-name">tasks_db</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Estado en vivo ──────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Estado en tiempo real <span class="pulse" style="color:var(--green);margin-left:.5rem;">●</span></div>
+    <div class="ticker" id="ticker">
+      <div class="ticker-item">
+        <div class="ticker-value" id="t-total">—</div>
+        <div class="ticker-label">Tareas totales</div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-value" id="t-running" style="color:var(--green);">—</div>
+        <div class="ticker-label">En ejecución</div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-value" id="t-finished" style="color:var(--muted);">—</div>
+        <div class="ticker-label">Finalizadas</div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-value" id="t-records" style="color:var(--accent2);">—</div>
+        <div class="ticker-label">Registros recibidos</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Endpoints ───────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Endpoints disponibles</div>
+    <div class="endpoints-grid">
+
+      <div class="endpoint-card post">
+        <span class="ep-method post">POST</span>
+        <div class="ep-path">/api/orquestar-tarea</div>
+        <div class="ep-title">Crear & Orquestar Tarea</div>
+        <div class="ep-desc">Genera un <code>taskId</code> único, simula el lanzamiento del microservicio y devuelve la <code>callback_url</code>.</div>
+        <div class="ep-fields">
+          <div class="ep-fields-title">BODY JSON</div>
+          <span class="field-pill required">userId *</span>
+          <span class="field-pill required">serviceType *</span>
+        </div>
+      </div>
+
+      <div class="endpoint-card post">
+        <span class="ep-method post">POST</span>
+        <div class="ep-path">/api/recibir-datos</div>
+        <div class="ep-title">Callback del Microservicio</div>
+        <div class="ep-desc">Recibe datos del microservicio simulado. Acepta <code>multipart/form-data</code> o JSON. Responde <code>204 No Content</code>.</div>
+        <div class="ep-fields">
+          <div class="ep-fields-title">FIELDS</div>
+          <span class="field-pill required">taskId *</span>
+          <span class="field-pill">data_field_1</span>
+          <span class="field-pill">data_field_2</span>
+          <span class="field-pill">…cualquier campo</span>
+        </div>
+      </div>
+
+      <div class="endpoint-card post">
+        <span class="ep-method post">POST</span>
+        <div class="ep-path">/api/finalizar-tarea</div>
+        <div class="ep-title">Finalizar Tarea</div>
+        <div class="ep-desc">Cambia el estado de la tarea a <code>finished</code>. A partir de este punto no se aceptan más callbacks.</div>
+        <div class="ep-fields">
+          <div class="ep-fields-title">BODY JSON</div>
+          <span class="field-pill required">taskId *</span>
+        </div>
+      </div>
+
+      <div class="endpoint-card get">
+        <span class="ep-method get">GET</span>
+        <div class="ep-path">/api/estado-tareas/&lt;userId&gt;</div>
+        <div class="ep-title">Estado por Usuario</div>
+        <div class="ep-desc">Devuelve todas las tareas de un usuario con sus datos recolectados. Útil para el dashboard del cliente.</div>
+        <div class="ep-fields">
+          <div class="ep-fields-title">URL PARAM</div>
+          <span class="field-pill required">userId *</span>
+        </div>
+      </div>
+
+      <div class="endpoint-card get">
+        <span class="ep-method get">GET</span>
+        <div class="ep-path">/api/admin/estado-global</div>
+        <div class="ep-title">Supervisión Global [ADMIN]</div>
+        <div class="ep-desc">Vista completa de todas las tareas y todos los datos. Demuestra la capacidad de supervisión centralizada del orquestador.</div>
+        <div class="ep-fields">
+          <div class="ep-fields-title">AUTH (producción)</div>
+          <span class="field-pill">Bearer Token</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Playground ──────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Playground interactivo</div>
+    <div class="try-panel">
+      <div class="try-tabs">
+        <button class="try-tab active" onclick="setTab('create')">1 · Crear Tarea</button>
+        <button class="try-tab" onclick="setTab('callback')">2 · Enviar Datos</button>
+        <button class="try-tab" onclick="setTab('finish')">3 · Finalizar</button>
+        <button class="try-tab" onclick="setTab('status')">4 · Ver Estado</button>
+      </div>
+
+      <!-- Tab: Crear tarea -->
+      <div class="try-body active" id="tab-create">
+        <label class="try-label">USER ID</label>
+        <input class="try-input" id="c-userId" value="user-demo-01" />
+        <label class="try-label">SERVICE TYPE</label>
+        <input class="try-input" id="c-serviceType" value="data-collector-microsoft" />
+        <button class="try-btn" onclick="doCreate()">⚡ ORQUESTAR TAREA</button>
+        <div class="try-output dim" id="c-out">Resultado aparecerá aquí…</div>
+      </div>
+
+      <!-- Tab: Enviar datos -->
+      <div class="try-body" id="tab-callback">
+        <label class="try-label">TASK ID (del paso anterior)</label>
+        <input class="try-input" id="cb-taskId" placeholder="Pega el taskId aquí" />
+        <label class="try-label">DATA FIELD 1</label>
+        <input class="try-input" id="cb-f1" value="registro_001" />
+        <label class="try-label">DATA FIELD 2</label>
+        <input class="try-input" id="cb-f2" value="valor_ejemplo" />
+        <button class="try-btn" onclick="doCallback()">📡 ENVIAR DATOS (CALLBACK)</button>
+        <div class="try-output dim" id="cb-out">Resultado aparecerá aquí…</div>
+      </div>
+
+      <!-- Tab: Finalizar -->
+      <div class="try-body" id="tab-finish">
+        <label class="try-label">TASK ID</label>
+        <input class="try-input" id="f-taskId" placeholder="Pega el taskId aquí" />
+        <button class="try-btn" onclick="doFinish()">🔴 FINALIZAR TAREA</button>
+        <div class="try-output dim" id="f-out">Resultado aparecerá aquí…</div>
+      </div>
+
+      <!-- Tab: Ver estado -->
+      <div class="try-body" id="tab-status">
+        <label class="try-label">USER ID (dejar vacío para vista global admin)</label>
+        <input class="try-input" id="s-userId" placeholder="Ej: user-demo-01 (vacío = admin global)" />
+        <button class="try-btn" onclick="doStatus()">🔍 CONSULTAR ESTADO</button>
+        <div class="try-output dim" id="s-out">Resultado aparecerá aquí…</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ════════════════════════════ FOOTER ════════════════════════════════ -->
+<footer>
+  <span>DemoSync</span> · Simulación de Orquestador de Microservicios · Flask + Python · Estado en memoria
+</footer>
+
+<!-- ════════════════════════════ JS ════════════════════════════════════ -->
+<script>
+  /* ── Tab switcher ───────────────────────────────────────────────── */
+  function setTab(name) {
+    document.querySelectorAll('.try-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.try-body').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  /* ── Helpers ────────────────────────────────────────────────────── */
+  function setOut(id, text, isError) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'try-output' + (isError ? ' error' : '');
+  }
+
+  async function apiFetch(path, options) {
+    const res = await fetch(path, options);
+    const text = await res.text();
+    try { return { ok: res.ok, status: res.status, data: JSON.parse(text) }; }
+    catch { return { ok: res.ok, status: res.status, data: text || '(204 No Content)' }; }
+  }
+
+  /* ── 1. Crear tarea ─────────────────────────────────────────────── */
+  async function doCreate() {
+    const userId      = document.getElementById('c-userId').value.trim();
+    const serviceType = document.getElementById('c-serviceType').value.trim();
+    if (!userId || !serviceType) { setOut('c-out', 'Rellena userId y serviceType.', true); return; }
+    setOut('c-out', 'Enviando…', false);
+    const { ok, data } = await apiFetch('/api/orquestar-tarea', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, serviceType })
+    });
+    setOut('c-out', JSON.stringify(data, null, 2), !ok);
+    if (ok && data.taskId) {
+      document.getElementById('cb-taskId').value = data.taskId;
+      document.getElementById('f-taskId').value  = data.taskId;
+    }
+    refreshTicker();
+  }
+
+  /* ── 2. Enviar datos (callback) ─────────────────────────────────── */
+  async function doCallback() {
+    const taskId = document.getElementById('cb-taskId').value.trim();
+    const f1     = document.getElementById('cb-f1').value;
+    const f2     = document.getElementById('cb-f2').value;
+    if (!taskId) { setOut('cb-out', 'Rellena el taskId.', true); return; }
+    setOut('cb-out', 'Enviando…', false);
+    const { ok, status, data } = await apiFetch('/api/recibir-datos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, data_field_1: f1, data_field_2: f2 })
+    });
+    setOut('cb-out', status === 204 || data === '(204 No Content)'
+      ? '✅ 204 No Content — Datos recibidos correctamente.'
+      : JSON.stringify(data, null, 2), !ok);
+    refreshTicker();
+  }
+
+  /* ── 3. Finalizar tarea ─────────────────────────────────────────── */
+  async function doFinish() {
+    const taskId = document.getElementById('f-taskId').value.trim();
+    if (!taskId) { setOut('f-out', 'Rellena el taskId.', true); return; }
+    setOut('f-out', 'Enviando…', false);
+    const { ok, data } = await apiFetch('/api/finalizar-tarea', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId })
+    });
+    setOut('f-out', JSON.stringify(data, null, 2), !ok);
+    refreshTicker();
+  }
+
+  /* ── 4. Ver estado ──────────────────────────────────────────────── */
+  async function doStatus() {
+    const userId = document.getElementById('s-userId').value.trim();
+    const path   = userId ? `/api/estado-tareas/${encodeURIComponent(userId)}` : '/api/admin/estado-global';
+    setOut('s-out', 'Consultando…', false);
+    const { ok, data } = await apiFetch(path, { method: 'GET' });
+    setOut('s-out', JSON.stringify(data, null, 2), !ok);
+  }
+
+  /* ── Ticker refresh ─────────────────────────────────────────────── */
+  async function refreshTicker() {
+    try {
+      const { data } = await apiFetch('/api/admin/estado-global', { method: 'GET' });
+      if (data && data.summary) {
+        document.getElementById('t-total').textContent    = data.summary.totalTasks;
+        document.getElementById('t-running').textContent  = data.summary.runningTasks;
+        document.getElementById('t-finished').textContent = data.summary.finishedTasks;
+        document.getElementById('t-records').textContent  = data.summary.totalRecords;
+      }
+    } catch(_) {}
+  }
+
+  // Poll cada 5s y arranque inicial
+  refreshTicker();
+  setInterval(refreshTicker, 5000);
+</script>
+</body>
+</html>
