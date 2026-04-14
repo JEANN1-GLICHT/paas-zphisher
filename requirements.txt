@@ -1,0 +1,6 @@
+# DemoSync - Dependencias
+# uuid viene incluido en la biblioteca estándar de Python 3.x,
+# pero se lista explícitamente como buena práctica de documentación.
+flask>=3.0.0
+uuid
+gunicorn>=21.2.0
